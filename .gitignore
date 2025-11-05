@@ -1,0 +1,7 @@
+.stat
+postgres_data/
+.DS_*
+__pycache__
+terraform*
+*.txt
+.terraform*

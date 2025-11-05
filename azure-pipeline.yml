@@ -1,0 +1,76 @@
+name: $(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
+
+
+trigger:
+  branches:
+    include:
+      - refs/heads/production
+      - refs/heads/feat/*
+
+parameters:
+  - name: TRIGGER_PLAN
+    displayName: Plan
+    type: boolean
+    default: true
+  - name: TRIGGER_DEPLOYMENT
+    displayName: Deploy
+    type: boolean
+    default: false
+  - name: TRIGGER_DESTROY
+    displayName: Destroy
+    type: boolean
+    default: false
+
+stages:
+  - stage: 'Plan'
+    # dependsOn: 'Quality'
+    displayName: 'Planning Deployment'
+    condition: eq(${{ parameters.TRIGGER_PLAN }}, True)
+    jobs:
+      - job: 'Plan'
+        displayName: 'Plan Deployment Job'
+        pool:
+          name: ac-shopping-ado-pool
+        workspace:
+          clean: all
+        steps:        
+          - bash: |
+              echo 'Executing Terraform Plan - Data Processing'
+              make plan
+            displayName: 'Terraform Plan - Data Processing'
+
+  - stage: 'Apply'
+    dependsOn: 'Plan'
+    displayName: 'Applying Deployment'
+    condition: eq(${{ parameters.TRIGGER_DEPLOYMENT }}, True)
+    jobs:
+      - job: 'Apply'
+        displayName: 'Apply Deployment Job'
+        pool:
+          name: ac-shopping-ado-pool
+        workspace:
+          clean: all
+        steps:        
+          - bash: |
+              echo 'Executing Terraform Apply - Airflow ECS'
+              make apply
+            displayName: 'Terraform Apply - Airflow ECS'
+          - bash: |
+              echo 'Executing Image building - Airflow ECS'
+              make build-image
+            displayName: 'Build Image - Airflow ECS'
+  - stage: 'Destroy'
+    displayName: 'Destroy Deployment'
+    condition: and(eq(${{ parameters.TRIGGER_DESTROY }}, True),eq(${{ parameters.TRIGGER_DEPLOYMENT }}, False))
+    jobs:
+      - job: 'Destroy'
+        displayName: 'Destroy Deployment Job'
+        pool:
+          name: ac-shopping-ado-pool
+        workspace:
+          clean: all
+        steps:        
+          - bash: |
+              echo 'Executing Terraform Destroy - Airflow ECS'
+              make destroy
+            displayName: 'Terraform Destroy - Airflow ECS'
